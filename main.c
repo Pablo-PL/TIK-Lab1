@@ -1,178 +1,111 @@
-
-#include <stdio.h>
-#include <stdlib.h>
+#include <errno.h>
+#include <inttypes.h>
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
-unsigned char *tablica = NULL;
-size_t ilosc = 0;
-size_t rozmiar = 4;
-size_t licznik[256] = {0};
-double H = 0.0;
-
-int odczyt_zapis(const char *nazwa_pliku)
+static int analyze_file(const char *path, uintmax_t counts[256],
+                        uintmax_t *total_bytes)
 {
-    FILE *plik;
-    int bajt;
+    FILE *file;
+    int value;
 
-    plik = fopen(nazwa_pliku, "rb");
-
-    if (plik == NULL)
-    {
-        fprintf(stderr, "Nie mozna otworzyc pliku!\n");
-        return 1;
+    file = fopen(path, "rb");
+    if (file == NULL) {
+        fprintf(stderr, "Nie mozna otworzyc pliku '%s': %s\n", path,
+                strerror(errno));
+        return -1;
     }
 
-    tablica = malloc(rozmiar * sizeof(unsigned char));
+    memset(counts, 0, 256U * sizeof(counts[0]));
+    *total_bytes = 0;
 
-    if (tablica == NULL)
-    {
-        fprintf(stderr, "Blad alokacji pamieci!\n");
-        fclose(plik);
-        return 1;
-    }
+    while ((value = fgetc(file)) != EOF) {
+        const unsigned char symbol = (unsigned char)value;
 
-    while ((bajt = fgetc(plik)) != EOF)
-    {
-        if (ilosc == rozmiar)
-        {
-            if (rozmiar > SIZE_MAX / 2)
-            {
-                fprintf(stderr, "Przekroczono limit pamieci!\n");
-                free(tablica);
-                tablica = NULL;
-                fclose(plik);
-                return 1;
-            }
-
-            rozmiar *= 2;
-
-            unsigned char *temp = realloc(tablica, rozmiar);
-
-            if (temp == NULL)
-            {
-                fprintf(stderr, "Blad powiekszania pamieci!\n");
-                free(tablica);
-                tablica = NULL;
-                fclose(plik);
-                return 1;
-            }
-
-            tablica = temp;
+        if (*total_bytes == UINTMAX_MAX || counts[symbol] == UINTMAX_MAX) {
+            fprintf(stderr, "Plik jest zbyt duzy do reprezentacji licznikow.\n");
+            (void)fclose(file);
+            return -1;
         }
-
-        tablica[ilosc] = (unsigned char)bajt;
-        licznik[(unsigned char)bajt]++;
-        ilosc++;
+        ++counts[symbol];
+        ++(*total_bytes);
     }
 
-    if (ferror(plik))
-    {
-        fprintf(stderr, "Blad odczytu pliku!\n");
-        free(tablica);
-        tablica = NULL;
-        fclose(plik);
-        return 1;
+    if (ferror(file)) {
+        fprintf(stderr, "Blad odczytu pliku '%s'.\n", path);
+        (void)fclose(file);
+        return -1;
     }
 
-    if (fclose(plik) != 0)
-    {
-        fprintf(stderr, "Blad zamykania pliku!\n");
-        free(tablica);
-        tablica = NULL;
-        return 1;
+    if (fclose(file) != 0) {
+        fprintf(stderr, "Blad zamykania pliku '%s'.\n", path);
+        return -1;
     }
 
     return 0;
 }
 
-void z1()
+static unsigned int count_distinct_symbols(const uintmax_t counts[256])
 {
-    printf("\n");
-    printf("========================================\n");
-    printf("              ZADANIE 1.\n");
-    printf("========================================\n");
+    unsigned int distinct = 0;
+    size_t i;
 
-    printf("Rozmiar pliku: %zu bajtow\n", ilosc);
-}
-
-void z2()
-{
-    printf("\n");
-    printf("========================================\n");
-    printf("              ZADANIE 2.\n");
-    printf("========================================\n");
-
-    int rozne = 0;
-
-    for (int i = 0; i < 256; i++)
-    {
-        if (licznik[i] > 0)
-        {
-            rozne++;
+    for (i = 0; i < 256U; ++i) {
+        if (counts[i] != 0) {
+            ++distinct;
         }
     }
-
-    printf("Liczba roznych wartosci bajtow: %d\n", rozne);
+    return distinct;
 }
 
-void z3()
+static double calculate_entropy(const uintmax_t counts[256],
+                                uintmax_t total_bytes)
 {
-    printf("\n");
-    printf("========================================\n");
-    printf("              ZADANIE 3.\n");
-    printf("========================================\n");
+    double entropy = 0.0;
+    size_t i;
 
-    H = 0.0;
-
-    if (ilosc > 0)
-    {
-        for (int i = 0; i < 256; i++)
-        {
-            if (licznik[i] > 0)
-            {
-                double p = (double)licznik[i] / (double)ilosc;
-                H -= p * log2(p);
-            }
-        }
+    if (total_bytes == 0) {
+        return 0.0;
     }
 
-    printf("Entropia H: %.6f bitow/symbol\n", H);
-}
-
-void z4()
-{
-    printf("\n");
-    printf("========================================\n");
-    printf("              ZADANIE 4.\n");
-    printf("========================================\n");
-
-    double minimalny_rozmiar = ((double)ilosc * H) / 8.0;
-
-    printf("Teoretyczny minimalny rozmiar po kompresji: %.6f bajtow\n",
-           minimalny_rozmiar);
+    for (i = 0; i < 256U; ++i) {
+        if (counts[i] != 0) {
+            const double probability =
+                (double)counts[i] / (double)total_bytes;
+            entropy -= probability * log2(probability);
+        }
+    }
+    return entropy;
 }
 
 int main(int argc, char *argv[])
 {
-    if (argc != 2)
-    {
-        fprintf(stderr, "Uzycie: entropy <plik>\n");
+    uintmax_t counts[256];
+    uintmax_t total_bytes;
+    unsigned int distinct;
+    double entropy;
+    double theoretical_size;
+
+    if (argc != 2) {
+        fprintf(stderr, "Uzycie: %s <plik>\n", argc > 0 ? argv[0] : "entropy");
         return 1;
     }
 
-    if (odczyt_zapis(argv[1]) != 0)
-    {
+    if (analyze_file(argv[1], counts, &total_bytes) != 0) {
         return 1;
     }
 
-    z1();
-    z2();
-    z3();
-    z4();
+    distinct = count_distinct_symbols(counts);
+    entropy = calculate_entropy(counts, total_bytes);
+    theoretical_size = (double)total_bytes * entropy / 8.0;
 
-    free(tablica);
-    tablica = NULL;
+    printf("Rozmiar pliku: %" PRIuMAX " bajtow\n", total_bytes);
+    printf("Liczba roznych wartosci bajtow: %u\n", distinct);
+    printf("Entropia H: %.6f bitow/symbol\n", entropy);
+    printf("Teoretyczny minimalny rozmiar po kompresji: %.6f bajtow\n",
+           theoretical_size);
 
     return 0;
 }

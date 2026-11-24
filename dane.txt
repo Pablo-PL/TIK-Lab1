@@ -1,1 +1,1 @@
-AAAAABBBCC
+To jest przykladowy plik tekstowy do analizy entropii.

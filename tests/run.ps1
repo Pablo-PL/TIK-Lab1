@@ -1,86 +1,86 @@
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
+$Root = Split-Path -Parent $PSScriptRoot
+Set-Location $Root
 
-# Uruchamiaj skrypt z glownego katalogu projektu:
-# powershell -ExecutionPolicy Bypass -File tests\run.ps1
+$Gcc = Get-Command gcc -ErrorAction SilentlyContinue
+if (-not $Gcc) { throw 'Nie znaleziono gcc. Zainstaluj MinGW-w64 i dodaj gcc do PATH.' }
 
-$Root = (Get-Location).Path
-$Tests = Join-Path $Root "tests"
-$Entropy = Join-Path $Root "entropy.exe"
-$Results = Join-Path $Tests "wyniki_pomiarow.txt"
+$Asset = $PSScriptRoot
+$Entropy = Join-Path $Root 'entropy.exe'
+$TestExe = Join-Path $PSScriptRoot 'test_bitio.exe'
+$Results = Join-Path $PSScriptRoot 'wyniki_pomiarow_windows.txt'
 
-if (-not (Test-Path $Entropy)) {
-    Write-Error "Nie znaleziono entropy.exe w glownym katalogu. Najpierw skompiluj projekt."
-    exit 1
-}
-
-# 1. Pusty plik
-[System.IO.File]::WriteAllBytes((Join-Path $Tests "pusty.bin"), [byte[]]@())
-
-# 2. 1000 powtorzen bajtu 0x41 ('A')
-$repeated = New-Object byte[] 1000
-for ($i = 0; $i -lt $repeated.Length; $i++) {
-    $repeated[$i] = 0x41
-}
-[System.IO.File]::WriteAllBytes((Join-Path $Tests "powtorzenia.bin"), $repeated)
-
-# 3. Tekst testowy (UTF-8 bez BOM)
-$text = @'
-Teoria informacji i kodowania.
-Entropia opisuje srednia ilosc informacji przypadajaca na symbol.
-Ten plik sluzy do sprawdzenia programu analizujacego bajty.
-'@
-[System.IO.File]::WriteAllText((Join-Path $Tests "tekst.txt"), $text, [System.Text.UTF8Encoding]::new($false))
-
-# 4. Losowy plik 1 MiB – zgodnie z instrukcja laboratorium
-$randomBytes = New-Object byte[] (1MB)
-$rng = [System.Random]::new()
-$rng.NextBytes($randomBytes)
-[System.IO.File]::WriteAllBytes((Join-Path $Tests "losowy.bin"), $randomBytes)
-
-# 5. Archiwum ZIP utworzone z tekstu testowego
-$zipPath = Join-Path $Tests "archiwum.zip"
-if (Test-Path $zipPath) {
-    Remove-Item $zipPath -Force
-}
-Compress-Archive -Path (Join-Path $Tests "tekst.txt") -DestinationPath $zipPath -CompressionLevel Optimal
-
-# 6. Program wykonywalny – kopia entropy.exe
-Copy-Item $Entropy (Join-Path $Tests "entropy_test.exe") -Force
-
-$cases = @(
-    @{ Name = "Pusty plik"; Path = (Join-Path $Tests "pusty.bin") },
-    @{ Name = "1000 identycznych bajtow"; Path = (Join-Path $Tests "powtorzenia.bin") },
-    @{ Name = "Tekst"; Path = (Join-Path $Tests "tekst.txt") },
-    @{ Name = "Losowy plik 1 MiB"; Path = (Join-Path $Tests "losowy.bin") },
-    @{ Name = "Archiwum ZIP"; Path = $zipPath },
-    @{ Name = "Plik wykonywalny"; Path = (Join-Path $Tests "entropy_test.exe") }
-)
-
-$allOutput = @()
-$allOutput += "Wyniki testow programu entropy"
-$allOutput += "Data: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-$allOutput += ""
-
-foreach ($case in $cases) {
-    Write-Host ""
-    Write-Host "========== $($case.Name) ==========" -ForegroundColor Cyan
-
-    $output = & $Entropy $case.Path 2>&1
-    $exitCode = $LASTEXITCODE
-
-    $output | ForEach-Object { Write-Host $_ }
-
-    if ($exitCode -ne 0) {
-        Write-Error "Test nie powiodl sie: $($case.Name), kod wyjscia: $exitCode"
-        exit 1
+function Assert-Range([double]$Value, [double]$Min, [double]$Max, [string]$Name) {
+    if ($Value -lt $Min -or $Value -gt $Max) {
+        throw "$Name`: entropia H=$Value poza zakresem [$Min, $Max]."
     }
-
-    $allOutput += "========== $($case.Name) =========="
-    $allOutput += $output | ForEach-Object { "$_" }
-    $allOutput += ""
 }
 
-$allOutput | Set-Content -Path $Results -Encoding UTF8
+Write-Host '[1/5] Kompilacja entropy'
+& gcc -std=c11 -Wall -Wextra -Werror -O2 main.c bitio.c -o $Entropy -lm
+if ($LASTEXITCODE -ne 0) { throw 'Kompilacja entropy nie powiodla sie.' }
 
-Write-Host ""
-Write-Host "Testy zakonczone. Wyniki zapisano w: $Results" -ForegroundColor Green
+Write-Host '[2/5] Kompilacja testu bitio'
+& gcc -std=c11 -Wall -Wextra -Werror -O2 -I. tests\test_bitio.c bitio.c -o $TestExe
+if ($LASTEXITCODE -ne 0) { throw 'Kompilacja testu bitio nie powiodla sie.' }
+
+Write-Host '[3/5] Test modulu bitowego'
+& $TestExe
+if ($LASTEXITCODE -ne 0) { throw 'Test bitio nie powiodl sie.' }
+
+$Cases = @(
+    @{ Name = 'Pusty plik'; File = 'pusty.bin'; Min = 0.0; Max = 0.0 },
+    @{ Name = '1000 identycznych bajtow'; File = 'powtorzenia.bin'; Min = 0.0; Max = 0.0 },
+    @{ Name = 'Tekst polski'; File = 'tekst.txt'; Min = 4.0; Max = 5.0 },
+    @{ Name = 'Losowe dane 1 MiB'; File = 'losowy.bin'; Min = 7.95; Max = 8.0 },
+    @{ Name = 'Archiwum ZIP'; File = 'archiwum.zip'; Min = 7.80; Max = 8.0 }
+)
+$OutputLines = @('Wyniki pomiarow programu entropy (Windows / MinGW-w64)', '')
+Write-Host '[4/5] Analiza szesciu wymaganych przypadkow'
+foreach ($Case in $Cases) {
+    $Path = if ([IO.Path]::IsPathRooted([string]$Case.File)) { [string]$Case.File } else { Join-Path $Asset $Case.File }
+    if (-not (Test-Path $Path)) { throw "Brak zestawu testowego: $Path" }
+    $Lines = & $Entropy $Path 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Program entropy zakonczyl sie bledem: $($Case.Name)" }
+    $Lines | ForEach-Object { Write-Host $_ }
+    $EntropyLine = $Lines | Where-Object { $_ -match '^Entropia H: ' } | Select-Object -First 1
+    $Match = [regex]::Match([string]$EntropyLine, 'Entropia H: ([0-9]+\.[0-9]+)')
+    if (-not $Match.Success) { throw "Nie mozna odczytac H dla: $($Case.Name)" }
+    $H = [double]::Parse($Match.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture)
+    Assert-Range $H $Case.Min $Case.Max $Case.Name
+    $OutputLines += "=== $($Case.Name) ==="
+    $OutputLines += $Lines | ForEach-Object { [string]$_ }
+    $OutputLines += ''
+}
+
+$Lines = & $Entropy $Entropy 2>&1
+if ($LASTEXITCODE -ne 0) { throw 'Nie udalo sie przeanalizowac pliku wykonywalnego.' }
+$Lines | ForEach-Object { Write-Host $_ }
+$EntropyLine = $Lines | Where-Object { $_ -match '^Entropia H: ' } | Select-Object -First 1
+$Match = [regex]::Match([string]$EntropyLine, 'Entropia H: ([0-9]+\.[0-9]+)')
+if (-not $Match.Success) { throw 'Nie mozna odczytac H pliku wykonywalnego.' }
+$ExeH = [double]::Parse($Match.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture)
+Assert-Range $ExeH 0.0 7.99 'Plik wykonywalny'
+$OutputLines += '=== Plik wykonywalny entropy.exe ==='
+$OutputLines += $Lines | ForEach-Object { [string]$_ }
+
+Write-Host '[5/5] Testy bledow'
+$Lines = & $Entropy 2>&1
+if ($LASTEXITCODE -eq 0) { throw 'Brak argumentow powinien zwrocic blad.' }
+$Lines = & $Entropy 'a' 'b' 2>&1
+if ($LASTEXITCODE -eq 0) { throw 'Nadmiarowy argument powinien zwrocic blad.' }
+$Missing = Join-Path $env:TEMP 'plik-ktory-nie-istnieje-tik-l1.bin'
+$Lines = & $Entropy $Missing 2>&1
+if ($LASTEXITCODE -eq 0) { throw 'Brak pliku powinien zwrocic blad.' }
+
+[IO.File]::WriteAllLines($Results, $OutputLines, [Text.UTF8Encoding]::new($false))
+Write-Host "Wszystkie testy zakonczone powodzeniem. Wyniki: $Results" -ForegroundColor Green
+
+$DrMemory = Get-Command drmemory -ErrorAction SilentlyContinue
+if ($DrMemory) {
+    Write-Host 'Uruchamianie Dr. Memory...'
+    & drmemory -- $Entropy (Join-Path $Asset 'tekst.txt')
+    if ($LASTEXITCODE -ne 0) { throw 'Dr. Memory zglosil blad.' }
+} else {
+    Write-Host 'Dr. Memory nie jest zainstalowany – kontrola pamieci pominieta.'
+}

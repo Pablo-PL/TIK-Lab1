@@ -1,7 +1,15 @@
 @echo off
-gcc -std=c11 -Wall -Wextra -O2 main.c -o program.exe -lm
+setlocal
+cd /d "%~dp0"
+where gcc >nul 2>nul
 if errorlevel 1 (
-    echo Kompilacja nie powiodla sie.
+    echo BLAD: Nie znaleziono gcc. Zainstaluj MinGW-w64 i dodaj gcc do PATH.
     exit /b 1
 )
-echo Kompilacja zakonczona powodzeniem.
+gcc -std=c11 -Wall -Wextra -Werror -O2 main.c bitio.c -o entropy.exe -lm
+if errorlevel 1 (
+    echo BLAD: Kompilacja nie powiodla sie.
+    exit /b 1
+)
+echo OK: Zbudowano entropy.exe
+exit /b 0

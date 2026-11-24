@@ -1,135 +1,38 @@
-﻿Wyniki testow programu entropy
-Data: 2026-11-03 09:26:52
+Wyniki pomiarow programu entropy (Linux, GCC, -std=c11 -Wall -Wextra -Werror -O2)
+Archiwum ZIP jest dolaczonym zestawem testowym; plik wykonywalny jest budowany lokalnie.
 
-========== Pusty plik ==========
-
-========================================
-              ZADANIE 1.
-========================================
+=== Pusty plik ===
 Rozmiar pliku: 0 bajtow
-
-========================================
-              ZADANIE 2.
-========================================
 Liczba roznych wartosci bajtow: 0
-
-========================================
-              ZADANIE 3.
-========================================
 Entropia H: 0.000000 bitow/symbol
-
-========================================
-              ZADANIE 4.
-========================================
 Teoretyczny minimalny rozmiar po kompresji: 0.000000 bajtow
 
-========== 1000 identycznych bajtow ==========
-
-========================================
-              ZADANIE 1.
-========================================
+=== 1000 identycznych bajtow ===
 Rozmiar pliku: 1000 bajtow
-
-========================================
-              ZADANIE 2.
-========================================
 Liczba roznych wartosci bajtow: 1
-
-========================================
-              ZADANIE 3.
-========================================
 Entropia H: 0.000000 bitow/symbol
-
-========================================
-              ZADANIE 4.
-========================================
 Teoretyczny minimalny rozmiar po kompresji: 0.000000 bajtow
 
-========== Tekst ==========
-
-========================================
-              ZADANIE 1.
-========================================
+=== Tekst polski ===
 Rozmiar pliku: 156 bajtow
-
-========================================
-              ZADANIE 2.
-========================================
 Liczba roznych wartosci bajtow: 27
-
-========================================
-              ZADANIE 3.
-========================================
 Entropia H: 4.353715 bitow/symbol
-
-========================================
-              ZADANIE 4.
-========================================
 Teoretyczny minimalny rozmiar po kompresji: 84.897433 bajtow
 
-========== Losowy plik 1 MiB ==========
-
-========================================
-              ZADANIE 1.
-========================================
+=== Losowe dane 1 MiB ===
 Rozmiar pliku: 1048576 bajtow
-
-========================================
-              ZADANIE 2.
-========================================
 Liczba roznych wartosci bajtow: 256
+Entropia H: 7.999839 bitow/symbol
+Teoretyczny minimalny rozmiar po kompresji: 1048554.932827 bajtow
 
-========================================
-              ZADANIE 3.
-========================================
-Entropia H: 7.999836 bitow/symbol
-
-========================================
-              ZADANIE 4.
-========================================
-Teoretyczny minimalny rozmiar po kompresji: 1048554.448073 bajtow
-
-========== Archiwum ZIP ==========
-
-========================================
-              ZADANIE 1.
-========================================
-Rozmiar pliku: 233 bajtow
-
-========================================
-              ZADANIE 2.
-========================================
-Liczba roznych wartosci bajtow: 107
-
-========================================
-              ZADANIE 3.
-========================================
-Entropia H: 5.729002 bitow/symbol
-
-========================================
-              ZADANIE 4.
-========================================
-Teoretyczny minimalny rozmiar po kompresji: 166.857193 bajtow
-
-========== Plik wykonywalny ==========
-
-========================================
-              ZADANIE 1.
-========================================
-Rozmiar pliku: 60826 bajtow
-
-========================================
-              ZADANIE 2.
-========================================
+=== Archiwum ZIP ===
+Rozmiar pliku: 1049014 bajtow
 Liczba roznych wartosci bajtow: 256
+Entropia H: 7.999838 bitow/symbol
+Teoretyczny minimalny rozmiar po kompresji: 1048992.759676 bajtow
 
-========================================
-              ZADANIE 3.
-========================================
-Entropia H: 4.837547 bitow/symbol
-
-========================================
-              ZADANIE 4.
-========================================
-Teoretyczny minimalny rozmiar po kompresji: 36781.081705 bajtow
-
+=== Plik wykonywalny ===
+Rozmiar pliku: 16768 bajtow
+Liczba roznych wartosci bajtow: 244
+Entropia H: 2.853712 bitow/symbol
+Teoretyczny minimalny rozmiar po kompresji: 5981.380578 bajtow
