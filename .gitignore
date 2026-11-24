@@ -1,17 +1,20 @@
-# Pliki wynikowe kompilacji
+# Wyniki kompilacji
 entropy
 entropy.exe
 *.o
 *.obj
 
-# Programy testowe i pliki tymczasowe
+# Pliki wykonywalne testow
 tests/test_bitio
 tests/test_bitio.exe
+
+# Pliki tymczasowe testow
 tests/test_bitio_tmp.bin
 
-# Wyniki pomiarow generowane lokalnie
+# Raporty generowane lokalnie przez skrypty
+tests/wyniki_pomiarow.txt
 tests/wyniki_pomiarow_windows.txt
 
-# Pliki w katalogu diagnostycznym
+# Pliki diagnostyczne
 stderr/*
 !stderr/.gitkeep

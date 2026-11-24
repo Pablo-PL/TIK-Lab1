@@ -1,3 +1,0 @@
-Teoria informacji i kodowania.
-Entropia opisuje srednia ilosc informacji przypadajaca na symbol.
-Ten plik sluzy do sprawdzenia programu analizujacego bajty.
